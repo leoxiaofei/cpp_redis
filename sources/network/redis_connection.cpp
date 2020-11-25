@@ -60,11 +60,14 @@ namespace cpp_redis {
 			try {
 				__CPP_REDIS_LOG(debug, "cpp_redis::network::redis_connection attempts to connect");
 
+				m_reply_callback = client_reply_callback;
+				m_disconnection_handler = client_disconnection_handler;
+
 /**
  * connect client
  */
-				m_client->connect(host, (uint32_t) port, timeout_ms);
 				m_client->set_on_disconnection_handler(std::bind(&redis_connection::tcp_client_disconnection_handler, this));
+				m_client->connect(host, (uint32_t) port, timeout_ms);
 
 /**
  * start to read asynchronously
@@ -81,8 +84,6 @@ namespace cpp_redis {
 				throw redis_error(e.what());
 			}
 
-			m_reply_callback = client_reply_callback;
-			m_disconnection_handler = client_disconnection_handler;
 		}
 
 		void

@@ -416,32 +416,28 @@ subscriber::connection_disconnection_handler(network::redis_connection&) {
 
   //! initiate reconnection process
   m_reconnecting               = true;
-  m_current_reconnect_attempts = 0;
-
-  __CPP_REDIS_LOG(warn, "cpp_redis::subscriber has been disconnected");
-
-  if (m_connect_callback) {
-    m_connect_callback(m_redis_server, m_redis_port, connect_state::dropped);
-  }
 
   //! Lock the callbacks mutex of the base class to prevent more subscriber commands from being issued until our reconnect has completed.
   std::lock_guard<std::mutex> sub_lock_callback(m_subscribed_channels_mutex);
   std::lock_guard<std::mutex> psub_lock_callback(m_psubscribed_channels_mutex);
 
-  while (should_reconnect()) {
+  if (should_reconnect()) {
+  __CPP_REDIS_LOG(warn, "cpp_redis::subscriber has been disconnected");
+
+    if (m_connect_callback) {
+      m_connect_callback(m_redis_server, m_redis_port, connect_state::dropped);
+    }
+
     sleep_before_next_reconnect_attempt();
     reconnect();
   }
-
-  if (!is_connected()) {
+  else if (!is_connected()) {
     clear_subscriptions();
 
     //! Tell the user we gave up!
-    if (m_connect_callback) {
+    if (m_connect_callback) 
       m_connect_callback(m_redis_server, m_redis_port, connect_state::stopped);
-    }
   }
-
   //! terminate reconnection
   m_reconnecting = false;
 }
@@ -497,13 +493,9 @@ subscriber::reconnect() {
     return;
   }
 
-  //! notify end
-  if (m_connect_callback) {
-    m_connect_callback(m_redis_server, m_redis_port, connect_state::ok);
-  }
-
   __CPP_REDIS_LOG(info, "client reconnected ok");
 
+  m_current_reconnect_attempts = 0;
   re_auth();
   // This is the only window that the Redis server will let us send the CLIENT SETNAME
   // (i.e. between the re_auth and the re_subscriber).  So this needs to be done

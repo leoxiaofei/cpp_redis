@@ -338,8 +338,11 @@ namespace cpp_redis {
 /**
  * initiate reconnection process
  */
+		std::lock_guard<std::mutex> lock_callback(m_callbacks_mutex);
+
 		m_reconnecting = true;
-		m_current_reconnect_attempts = 0;
+
+		if (should_reconnect()) {
 
 		__CPP_REDIS_LOG(warn, "cpp_redis::client has been disconnected");
 
@@ -350,14 +353,10 @@ namespace cpp_redis {
 /**
  * Lock the callbacks mutex of the base class to prevent more client commands from being issued until our reconnect has completed.
  */
-		std::lock_guard<std::mutex> lock_callback(m_callbacks_mutex);
-
-		while (should_reconnect()) {
 			sleep_before_next_reconnect_attempt();
 			reconnect();
 		}
-
-		if (!is_connected()) {
+		else if (!should_reconnect()) {
 			clear_callbacks();
 
 /**
@@ -466,14 +465,9 @@ namespace cpp_redis {
 			return;
 		}
 
-/**
- * notify end
- */
-		if (m_connect_callback) {
-			m_connect_callback(m_redis_server, m_redis_port, connect_state::ok);
-		}
-
 		__CPP_REDIS_LOG(info, "client reconnected ok");
+
+		m_current_reconnect_attempts = 0;
 
 		re_auth();
 		re_select();
